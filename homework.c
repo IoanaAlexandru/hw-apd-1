@@ -17,56 +17,35 @@ void alloc_image(image *img) {
         (unsigned char *) malloc((size_t) real_width * sizeof(unsigned char *));
 }
 
-void resize_bw(image *in, image *out) {
-  int i1, j1, i2, j2, sum;
-  int gaussian_kernel[3][3] = {{1, 2, 1}, {2, 4, 2}, {1, 2, 1}};
-  int count = resize_factor == 3 ? 16 : resize_factor * resize_factor;
-
-  for (i1 = 0; i1 < out->height; i1++) {
-    for (j1 = 0; j1 < out->width; j1++) {
-      sum = 0;
-      for (i2 = i1 * resize_factor; i2 < (i1 + 1) * resize_factor; i2++) {
-        for (j2 = j1 * resize_factor; j2 < (j1 + 1) * resize_factor; j2++) {
-          if (resize_factor == 3)
-            sum += in->image[i2][j2] * gaussian_kernel[i2 % 3][j2 % 3];
-          else
-            sum += in->image[i2][j2];
-        }
-      }
-      out->image[i1][j1] = (unsigned char) (sum / count);
+unsigned char get_pixel(const image *in,
+                        int i1,
+                        int j1,
+                        int gaussian_kernel[3][3],
+                        int count,
+                        int num_colors) {
+  int sum = 0;
+  for (int i2 = i1 * resize_factor; i2 < (i1 + 1) * resize_factor; i2++) {
+    for (int j2 = j1 * resize_factor; j2 < (j1 + num_colors) * resize_factor;
+         j2 += num_colors) {
+      if (resize_factor == 3)
+        sum += in->image[i2][j2] * gaussian_kernel[i2 % 3][j2 / num_colors % 3];
+      else
+        sum += in->image[i2][j2];
     }
   }
+  return (unsigned char) (sum / count);
 }
 
-void resize_color(image *in, image *out) {
-  int i1, j1, i2, j2, sum_red, sum_green, sum_blue;\
+void resize_image(image *in, image *out) {
+  int i1, j1;
   int gaussian_kernel[3][3] = {{1, 2, 1}, {2, 4, 2}, {1, 2, 1}};
   int count = resize_factor == 3 ? 16 : resize_factor * resize_factor;
+  int num_colors = in->type == 5 ? 1 : 3;
 
   for (i1 = 0; i1 < out->height; i1++) {
-    for (j1 = 0; j1 < out->width * 3; j1 += 3) {
-      sum_red = 0;
-      sum_green = 0;
-      sum_blue = 0;
-      for (i2 = i1 * resize_factor; i2 < (i1 + 1) * resize_factor; i2++) {
-        for (j2 = j1 * resize_factor; j2 < (j1 + 3) * resize_factor;
-             j2 += 3) {
-          if (resize_factor == 3) {
-            sum_red += in->image[i2][j2] * gaussian_kernel[i2 % 3][j2 / 3 % 3];
-            sum_green +=
-                in->image[i2][j2 + 1] * gaussian_kernel[i2 % 3][j2 / 3 % 3];
-            sum_blue +=
-                in->image[i2][j2 + 2] * gaussian_kernel[i2 % 3][j2 / 3 % 3];
-          } else {
-            sum_red += in->image[i2][j2];
-            sum_green += in->image[i2][j2 + 1];
-            sum_blue += in->image[i2][j2 + 2];
-          }
-        }
-      }
-      out->image[i1][j1] = (unsigned char) (sum_red / count);
-      out->image[i1][j1 + 1] = (unsigned char) (sum_green / count);
-      out->image[i1][j1 + 2] = (unsigned char) (sum_blue / count);
+    for (j1 = 0; j1 < out->width * num_colors; j1++) {
+      out->image[i1][j1] =
+          get_pixel(in, i1, j1, gaussian_kernel, count, num_colors);
     }
   }
 }
@@ -144,8 +123,5 @@ void resize(image *in, image *out) {
   out->maxval = in->maxval;
   alloc_image(out);
 
-  if (in->type == 5)
-    resize_bw(in, out);
-  else
-    resize_color(in, out);
+  resize_image(in, out);
 }
